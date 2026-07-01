@@ -121,3 +121,72 @@ I'm a second-year undergraduate actively looking for research mentorship and col
 ---
 
 <sub>Started June 2026 · IIT Bombay · All research conducted independently unless otherwise noted</sub>
+
+The literature surrounding computational olfaction is currently exploding. While the field was historically dominated by traditional Quantitative Structure–Activity Relationship (QSAR) models, the period from 2023 to early 2026 marks a definitive shift toward Graph Neural Networks (GNNs) and biological binding simulations.
+
+Because you are already familiar with the foundational Sanchez-Lengeling (2023) paper, this breakdown focuses on the most critical recent papers categorized by the exact engineering problem they solve for your architecture.
+
+## 1. Multi-Label Classification & Class Imbalance
+
+The core challenge in olfaction is that a single molecule rarely has one odor. It has a primary, secondary, and tertiary profile, and the training data is massively skewed (e.g., "fruity" appears in 27% of molecules, but "fennel" in <1%).
+
+### **Graph Neural Networks vs. Traditional QSAR: A Comprehensive Comparison for Multi-Label Molecular Odor Prediction** (Wang et al., *Molecules/MDPI*, 2025)
+
+* **The Problem:** Do modern GNNs actually outperform traditional machine learning (Random Forest, SVM, MLP) on imbalanced, multi-label odor datasets like GoodScents?
+* **The Methodology:** The researchers tested 23 model configurations across 3,304 molecules targeting the six most frequent odor types (fruity, green, sweet, floral, woody, herbal). They compared Graph Convolutional Networks (GCN), Graph Attention Networks (GAT), and NNConv against traditional descriptor-based models.
+* **The Findings:** GNNs won definitively. The GCN achieved a macro F1-score of 0.5193 compared to the best traditional MLP at 0.4766 (a 24.1% relative improvement).
+* **Key Takeaway for You:** The paper proves that **threshold optimization** is critical. You cannot use a standard $0.5$ probability threshold for binary relevance classification in olfaction; the threshold $\tau$ must be dynamically optimized per label (e.g., the threshold to classify a scent as "woody" must be mathematically lower than "fruity" due to dataset sparsity).
+
+### **Predicting odor from molecular structure: a multi-label classification approach** (Saini & Ramanathan, 2022)
+
+* **The Problem:** Handling the overlapping perceptual space of odor vocabularies (e.g., a dataset labeling a molecule as "apple" and another as "fruity").
+* **The Methodology:** Applied Louvain community detection to group 109 unique odor labels into mathematically correlated clusters.
+* **The Findings:** Demonstrated that odor prediction must be treated as a multi-label correlated graph problem (Classifier Chains), where the prediction of node $A$ ("citrus") dynamically updates the probability of node $B$ ("fresh").
+
+---
+
+## 2. The Formulation Problem: Predicting Blends
+
+Mapping a single molecule is solved. Mapping a perfume (a mixture of 50+ molecules) is the current frontier.
+
+### **Deep Learning for Odor Prediction on Aroma-Chemical Blends** (*ACS Omega*, 2025)
+
+* **The Problem:** The Principal Odor Map (POM) maps pure isolated molecules. But perfumery is about *accords*. How do you predict the emergent scent when two molecules are blended?
+* **The Methodology:** Shifts the input from a single molecular graph to a "blend graph" or weighted matrix. They utilized Message-Passing Neural Networks (MPNN) to capture the relationship between molecules interacting in a liquid state.
+* **The Findings:** The model successfully predicts olfactory qualities that *emerge* only upon blending, which neither constituent molecule possesses on its own.
+* **Key Takeaway for You:** If you are building an API for B2B formulation, this is your blueprint. Your input tensor cannot just be a single SMILES string; it must be a vector of SMILES strings weighted by their mole fractions $x_i$ to predict the resulting mixture embedding.
+
+---
+
+## 3. The Stereochemistry & Biological Constraint
+
+A major failing of pure 2D topological GNNs (like basic RDKit implementations) is that they are "blind" to 3D spatial orientation.
+
+### **Molecular Odor Prediction Using Olfactory Receptor Information** (*PMC*, 2024/2025)
+
+* **The Problem:** Optical isomers (enantiomers). For example, $d$-menthol and $l$-menthol have the exact same 2D chemical graph, functional groups, and molecular weight. Yet, $l$-menthol has a significantly stronger minty odor. Standard GNNs predict they smell identical.
+* **The Methodology:** The researchers built a three-tier model. Instead of directly mapping structure-to-odor, they mapped **structure-to-receptor**, then **receptor-to-odor**. They used classification models to predict if a molecule binds to specific human olfactory receptors, and regression models to predict binding affinity (strength).
+* **The Findings:** By using *predicted receptor activation patterns* as the intermediate latent space rather than pure structural descriptors, the model successfully discriminated between the odors of highly similar optical isomers.
+* **Key Takeaway for You:** To make your Indian Fragrance model robust, your neural network architecture should include a 3D conformational analysis layer (using something like conformer generation in RDKit) before the GNN message-passing phase.
+
+---
+
+## 4. The Dataset Construction Blueprint
+
+If you are building the "Indic Odor Map," you need to know how to structure the raw perceptual data.
+
+### **Machine-Learning-Based Olfactometry: Prediction of Odor Perception from Physicochemical Features** (*Analytical Chemistry*)
+
+* **The Problem:** Replacing human sensory panels in Gas Chromatography/Olfactometry (GC/O) with an ML model.
+* **The Methodology:** Extracted physicochemical features using DRAGON (molecular calculation software) and optimized feature extraction using Boruta (a random-forest wrapper). They mapped 1,026 odorants against ten high-frequency verbal odor descriptors.
+* **The Findings:** Achieved 97.08% accuracy for specific odor descriptors.
+* **Key Takeaway for You:** This provides the exact validation protocol for your dataset. When you scrape or collect data on Indian ingredients (e.g., Ruh Khus), you must run them through GC/MS first, extract the structural parameters, and validate your ML predictions against human panelist labels.
+
+---
+
+## Synthesizing This for Your Repo
+
+Looking at your `03_models` directory, you need to transition from the 2023 baseline to the 2025 blend-and-receptor frontier.
+
+1. **Drop pure SMILES strings for 3D graphs:** You cannot rely solely on 1D SMILES for the Indian market, as naturals heavily rely on complex stereochemistry. Use RDKit to generate 3D conformers (`AllChem.EmbedMolecule`).
+2. **Shift to Multi-Label Focal Loss:** Because descriptors like *Mitti* (baked earth) will be rare in your dataset compared to *Floral*, standard Cross-Entropy loss will ignore them. You must implement Focal Loss in your PyTorch training loop to heavily penalize the model for missing rare Indian notes.
